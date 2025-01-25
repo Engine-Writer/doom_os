@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include "types.h"
+#include "util.h"
 
 // VGA Text Mode dimensions
 #define VGA_WIDTH 80
@@ -55,7 +55,13 @@ void terminal_putchar(char c);
 void terminal_write(const char* data, size_t size);
 void terminal_writestring(const char* data);
 void terminal_clear(VGA_Color2 color);
+void terminal_printf(const char *format, ...);
+
 void terminal_set_cursor_position(uint8_Vector2 position);
 uint8_Vector2 terminal_get_cursor_position();
+
+//extern void (*cls)(VGA_Color2 color);
+//extern void (*printf)(const char *format, ...);
+
 
 #endif // TERMINAL_H

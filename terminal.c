@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "terminal.h"
-#include "types.h"
+#include "util.h"
 #include "io.h"
 
 #define VGA_WIDTH 80
@@ -17,6 +17,8 @@ static VGA_Color2 terminal_color;
 static uint16_t* terminal_buffer;
 
 void terminal_initialize() {
+    // cls = terminal_clear;  // Assign the terminal_clear function to cls
+    // printf = terminal_printf;  // Assign the terminal_printf function to printf
     terminal_row = 0;
     terminal_column = 0;
     terminal_color = make_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK); // White on Black
@@ -99,13 +101,15 @@ void terminal_clear(VGA_Color2 color) {
 }
 
 void terminal_set_cursor_position(uint8_Vector2 position) {
+    uint16_t index = position.y * VGA_WIDTH + position.x;
+
     // Send the high byte (upper 8 bits) to port 0x3D5
     outb(VGA_PORT_INDEX, 0x0E); // Cursor high byte index
-    outb(VGA_PORT_DATA, (position >> 8) & 0xFF);
+    outb(VGA_PORT_DATA, (index >> 8) & 0xFF);
 
     // Send the low byte (lower 8 bits) to port 0x3D5
     outb(VGA_PORT_INDEX, 0x0F); // Cursor low byte index
-    outb(VGA_PORT_DATA, position & 0xFF);
+    outb(VGA_PORT_DATA, index & 0xFF);
 }
 
 uint8_Vector2 terminal_get_cursor_position() {
@@ -119,5 +123,79 @@ uint8_Vector2 terminal_get_cursor_position() {
     outb(VGA_PORT_INDEX, 0x0F); // Cursor low byte index
     position |= inb(VGA_PORT_DATA);
 
-    return (uint8_Vector2)position;
+    uint8_Vector2 cursor_pos;
+    cursor_pos.x = position % VGA_WIDTH;   // Column (x)
+    cursor_pos.y = position / VGA_HEIGHT;   // Row (y)
+
+    return cursor_pos;
+}
+
+
+
+
+
+
+
+// Hipity Hopity Your code is now my property
+void terminal_printf(const char *format, ...) {
+    char **arg = (char **) &format;
+    uint32_t c;
+    char buf[20]; // Buffer for numbers converted to strings
+
+    arg++; // Skip the format string itself
+
+    while ((c = *format++) != 0) {
+        if (c != '%') {
+            terminal_putchar(c); // Print regular characters
+        } else {
+            char *p, *p2;
+            int pad0 = 0, pad = 0;
+
+            c = *format++;
+            if (c == '0') { // Padding with zeros
+                pad0 = 1;
+                c = *format++;
+            }
+
+            if (c >= '0' && c <= '9') { // Parse padding width
+                pad = c - '0';
+                c = *format++;
+            }
+
+            switch (c) {
+            case 'd': // Decimal
+            case 'u': // Unsigned decimal
+            case 'x': // Hexadecimal
+                itoa(*((int *)arg++), buf, (c == 'x') ? 16 : 10); // Fix the argument order
+                p = buf;
+                break;
+
+            case 's': // String
+                p = *arg++;
+                if (!p)
+                    p = "(null)";
+
+            string:
+                for (p2 = p; *p2; p2++); // Find string length
+                for (; p2 < p + pad; p2++) // Add padding
+                    terminal_putchar(pad0 ? '0' : ' ');
+                while (*p) // Print the string
+                    terminal_putchar(*p++);
+                break;
+
+            default: // Print the raw character
+                terminal_putchar(*((int *)arg++));
+                break;
+            }
+
+            // Print numbers or processed string
+            if (c == 'd' || c == 'u' || c == 'x') {
+                for (p2 = p; *p2; p2++); // Find the length of the number
+                for (; p2 < p + pad; p2++) // Add padding
+                    terminal_putchar(pad0 ? '0' : ' ');
+                while (*p) // Print the number
+                    terminal_putchar(*p++);
+            }
+        }
+    }
 }
